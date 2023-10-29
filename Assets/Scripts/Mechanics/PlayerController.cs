@@ -6,7 +6,6 @@ using static Platformer.Core.Simulation;
 using Platformer.Model;
 using Platformer.Core;
 using Unity.VisualScripting;
-using UnityEditor.UIElements;
 
 namespace Platformer.Mechanics
 {
@@ -23,7 +22,7 @@ namespace Platformer.Mechanics
         /// <summary>
         /// Max horizontal speed of the player.
         /// </summary>
-        public float maxSpeed = 3;
+        public float maxSpeed = 7;
         /// <summary>
         /// Initial jump velocity at the start of a jump.
         /// </summary>
@@ -38,13 +37,6 @@ namespace Platformer.Mechanics
 
         public ProjectileBehavior ProjectilePrefab;
         public Transform LaunchOffset;
-        public Transform AttackPoint;
-
-        public PlayerCloseCombat closeCombat;
-
-        SpriteRenderer sprite;
-
-        public float invincibilityFrames = 1f;
 
         bool jump;
         Vector2 move;
@@ -60,20 +52,10 @@ namespace Platformer.Mechanics
 
         // abilities related fields
 
-        public float projectileCooldown = 0.5f;
-        public float projectileDamage = 1;
+        public float projectileCooldown = 0.3f;
         public bool StrongerGravity = false;
 
         public bool CloseCombatEnabled = false;
-
-        public bool SlowFall = false;
-
-        public bool isInvincible = false;
-        public bool isSlowFalling = false;
-
-        /*public bool isFlying = false;
-        public float verticalFlySpeed = 1f;*/
-        public float slowFallSpeed = 0.5f;
 
 
         // abilities private attributes
@@ -90,8 +72,6 @@ namespace Platformer.Mechanics
             collider2d = GetComponent<Collider2D>();
             spriteRenderer = GetComponent<SpriteRenderer>();
             animator = GetComponent<Animator>();
-            closeCombat = GetComponent<PlayerCloseCombat>();
-            sprite = GetComponent<SpriteRenderer>();
         }
 
         protected override void Update()
@@ -105,10 +85,6 @@ namespace Platformer.Mechanics
                 {
                     stopJump = true;
                     Schedule<PlayerStopJump>().player = this;
-                }
-                else if(jumpState == JumpState.InFlight) {
-                    if(SlowFall && Input.GetButton("Jump"))
-                        isSlowFalling = true;
                 }
                 
                 if (Input.GetKeyDown(KeyCode.F)) {
@@ -160,10 +136,6 @@ namespace Platformer.Mechanics
                 velocity.y = jumpTakeOffSpeed * model.jumpModifier;
                 jump = false;
             }
-            else if (isSlowFalling && velocity.y < 0) {
-                isSlowFalling = false;
-                velocity.y -= (velocity.y + slowFallSpeed) * model.flightAcceleration;
-            }
             else if (stopJump)
             {
                 stopJump = false;
@@ -176,16 +148,12 @@ namespace Platformer.Mechanics
             if (move.x > 0.01f) {
                 spriteRenderer.flipX = false;
                 LaunchOffset.localPosition = new Vector3(Mathf.Abs(LaunchOffset.localPosition.x), LaunchOffset.localPosition.y, LaunchOffset.localPosition.z);
-                LaunchOffset.transform.rotation = Quaternion.Euler(0, 0, -90);
-                AttackPoint.localPosition = new Vector3(Mathf.Abs(AttackPoint.localPosition.x), AttackPoint.localPosition.y, AttackPoint.localPosition.z);
-                AttackPoint.transform.rotation = Quaternion.identity;
+                LaunchOffset.transform.rotation = Quaternion.identity;
             }
             else if (move.x < -0.01f) {
                 spriteRenderer.flipX = true;
                 LaunchOffset.localPosition = new Vector3(-1 * Mathf.Abs(LaunchOffset.localPosition.x), LaunchOffset.localPosition.y, LaunchOffset.localPosition.z);
-                LaunchOffset.transform.rotation = Quaternion.Euler(0, 180, -90);
-                AttackPoint.localPosition = new Vector3(-1 * Mathf.Abs(AttackPoint.localPosition.x), AttackPoint.localPosition.y, AttackPoint.localPosition.z);
-                AttackPoint.transform.rotation = Quaternion.Euler(0, 180, 0);
+                LaunchOffset.transform.rotation = Quaternion.Euler(0, 180, 0);
             }
 
             animator.SetBool("grounded", IsGrounded);
@@ -212,10 +180,10 @@ namespace Platformer.Mechanics
         }
 
         public void KnockBack(Vector2 dir) {
-            jumpState = JumpState.PrepareToJump;
-            //transform.position = new Vector3(transform.position.x, transform.position.y + 0.2f, transform.position.z);
-            Bounce(dir);
-            //velocity.y = dir.y;
+            jump = true;
+            transform.position = new Vector3(transform.position.x, transform.position.y + 0.2f, transform.position.z);
+            move.x = dir.x;
+            move.y = dir.y;
         }
 
         public void ChipCollected(ChipInstance.type type){
@@ -225,46 +193,9 @@ namespace Platformer.Mechanics
             else if (type == ChipInstance.type.DEFENSE) {
                 Defense++;
             }
-            switch(type) {
-                case ChipInstance.type.HEALTH:
-                    health.Increment();
-                    break;
-                case ChipInstance.type.DEFENSE:
-                    Defense++;
-                    break;
-                case ChipInstance.type.STAT_PROJ_SPD:
-                    projectileCooldown *= 0.9f;
-                    break;
-                case ChipInstance.type.STAT_PROJ_DMG:
-                    projectileDamage += 0.25f;
-                    break;
-                case ChipInstance.type.STAT_ATK_SPD:
-                    closeCombat.attackRate *= 0.9f;
-                    break;
-                case ChipInstance.type.STAT_ATK_DMG:
-                    closeCombat.MeleeDamage += 0.5f;
-                    break;
-                case ChipInstance.type.STAT_MVMT_SPD:
-                    maxSpeed += 0.25f;
-                    break;
+            else{
+                // add stats
             }
-        }
-
-        public void Damage(float damage = 1) {
-            if(isInvincible || !health.IsAlive)
-                return;
-            health.Decrement(damage);
-            audioSource.PlayOneShot(ouchAudio);
-            animator.SetTrigger("hurt");
-            StartCoroutine(InvincibleAfterHit());
-        }
-
-        public IEnumerator InvincibleAfterHit() {
-            isInvincible = true;
-            sprite.color = new Color(sprite.color.r, sprite.color.g, sprite.color.b, 0.7f);
-            yield return new WaitForSeconds(invincibilityFrames);
-            isInvincible = false;
-            sprite.color = new Color(sprite.color.r, sprite.color.g, sprite.color.b, 1f);
         }
 
         public enum JumpState
