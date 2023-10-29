@@ -11,12 +11,12 @@ public class ProjectileBehavior : MonoBehaviour
 
     private void Update()
     {
-        transform.position += transform.up * Time.deltaTime * speed; 
+        transform.position += transform.right * Time.deltaTime * speed; 
 
     }
 
     private void OnCollisionEnter2D(Collision2D other) {
-        if(!other.gameObject.CompareTag("Player"))
+        if(other.gameObject.tag != "Player")
             Destroy(gameObject); 
     }
 }

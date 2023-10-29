@@ -20,27 +20,23 @@ namespace Platformer.Mechanics
         internal Collider2D _collider;
         internal AudioSource _audio;
         internal Health health;
-        internal Vector3 startPos;
-
-        protected PlayerController player;
         SpriteRenderer spriteRenderer;
 
         public Bounds Bounds => _collider.bounds;
 
-        protected void Awake()
+        void Awake()
         {
             control = GetComponent<AnimationController>();
             _collider = GetComponent<Collider2D>();
             _audio = GetComponent<AudioSource>();
             spriteRenderer = GetComponent<SpriteRenderer>();
             health = GetComponent<Health>();
-            player = GameObject.FindGameObjectWithTag("Player").GetComponent<PlayerController>();
-            startPos = transform.position;
         }
 
-        protected void OnCollisionStay2D(Collision2D collision)
+        void OnCollisionEnter2D(Collision2D collision)
         {
             if(collision.gameObject.tag == "Player") {
+                var player = collision.gameObject.GetComponent<PlayerController>();
                 if (player != null)
                 {
                     var ev = Schedule<PlayerEnemyCollision>();
@@ -48,19 +44,12 @@ namespace Platformer.Mechanics
                     ev.enemy = this;
                 }
             }
-            else{
-                Debug.Log(collision.gameObject.tag);
+            else if(collision.gameObject.tag == "PlayerProjectile") {
+                health.Decrement(collision.gameObject.GetComponent<ProjectileBehavior>().damage);
             }
         }
 
-        protected void OnCollisionEnter2D(Collision2D collision) {
-            if(collision.gameObject.tag == "PlayerProjectile") {
-                health.Decrement(player.projectileDamage);
-                Destroy(collision.gameObject);
-            }
-        }
-
-        protected void Update()
+        void Update()
         {
             if (path != null)
             {
@@ -69,13 +58,5 @@ namespace Platformer.Mechanics
             }
         }
 
-        public void Die() {
-            StartCoroutine(Death());
-        }
-
-        public IEnumerator Death() {
-            yield return new WaitForSeconds(1);
-            Destroy(gameObject);
-        }
     }
 }
